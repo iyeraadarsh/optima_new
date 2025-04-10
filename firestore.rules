@@ -1,0 +1,214 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['super_admin', 'admin']);
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isManager(userId) {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(userId)).data.reportingManager == request.auth.uid ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['super_admin', 'admin', 'department_manager', 'manager']);
+    }
+
+    // Allow initial user creation during registration
+    match /users/{userId} {
+      allow create: if request.auth != null || !exists(/databases/$(database)/documents/users/$(userId));
+      allow read: if true;
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // User activities collection
+    match /userActivities/{activityId} {
+      allow create: if isAuthenticated() || request.resource.data.action == 'registration';
+      allow read: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // User permissions collection
+    match /userPermissions/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // Roles collection
+    match /roles/{roleId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Permissions collection
+    match /permissions/{permissionId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Departments collection
+    match /departments/{departmentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Positions collection
+    match /positions/{positionId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Activities collection
+    match /activities/{activityId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    // Module configurations
+    match /moduleConfig/{moduleId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // System configurations
+    match /systemConfig/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Workflow configurations
+    match /workflowConfig/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Security configurations
+    match /securityConfig/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Role-Module access settings
+    match /roleModuleAccess/{accessId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // User-Module access settings
+    match /userModuleAccess/{accessId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // Leave Management Collections
+    match /leaveTypes/{leaveTypeId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    
+    match /leavePolicies/{policyId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    
+    match /leaveRequests/{requestId} {
+      allow create: if isAuthenticated();
+      allow read: if true;
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+    
+    match /leaveBalances/{balanceId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    
+    // Performance Management Collections
+    match /goals/{goalId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && 
+        (request.auth.uid == resource.data.employeeId || isAdmin());
+    }
+    
+    match /goalComments/{commentId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow delete: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId || isAdmin());
+    }
+    
+    match /performanceReviews/{reviewId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+    
+    match /performanceSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin() || isAuthenticated();
+    }
+
+    // Work From Home Collections
+    match /workFromHomeRequests/{requestId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId || 
+         request.auth.uid == resource.data.approverId ||
+         isManager(resource.data.userId) ||
+         isAdmin());
+      allow delete: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId || isAdmin());
+    }
+    
+    match /workFromHomeApprovals/{approvalId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+        (request.auth.uid == resource.data.approverId || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    // Skills and Development Collections
+    match /skills/{skillId} {
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    match /developmentGoals/{goalId} {
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    match /developmentActivities/{activityId} {
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+  }
+}
